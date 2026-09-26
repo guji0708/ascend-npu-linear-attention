@@ -29,8 +29,8 @@ RE_TIME = re.compile(
 RE_TIME_ALT = re.compile(r"elapsed\s*[:=]?\s*([0-9]+\.?[0-9]*)\s*ms", re.IGNORECASE)
 RE_GBS = re.compile(r"global\s+batch\s+size\s*[:=]\s*(\d+)", re.IGNORECASE)
 
-# 官方评测口径: 取第 101-200 步均值（前 100 步为预热期）
-# 口径来源: examples/qwen3_5/finetune_qwen3_5_0.8B.sh（注释自称"与官方验收逻辑一致"）
+# 统一评测口径: 取第 101-200 步均值（前 100 步为预热期）
+# 口径来源: examples/qwen3_5/finetune_qwen3_5_0.8B.sh（注释自称"与上游示例逻辑一致"）
 #   grep "elapsed time per iteration" ... | head -n 200 | tail -n 100
 WINDOW_START, WINDOW_END = 101, 200
 
@@ -102,7 +102,7 @@ def parse_log(log_file):
     }
     metrics["total_steps"] = len(steps)
 
-    # ---- 单步耗时统计（官方口径 101-200 步；步数不足则降级并明说）----
+    # ---- 单步耗时统计（统一口径 101-200 步；步数不足则降级并明说）----
     win = [recs[s]["time"] for s in steps
            if WINDOW_START <= s <= WINDOW_END and recs[s]["time"] is not None]
     if win:

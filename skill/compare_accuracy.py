@@ -8,7 +8,7 @@
 | 口径                     | 定义                                             | 作用                 |
 |--------------------------|--------------------------------------------------|----------------------|
 | 轨迹偏差（主判据）       | 两轮 loss 各自做 50 步滑动平均后，再算逐点相对误差 | 两条收敛轨迹的系统性偏离 |
-| 逐点相对误差（参考）     | 直接对单步瞬时 loss 算相对误差                    | 与官方模板图形态一致 |
+| 逐点相对误差（参考）     | 直接对单步瞬时 loss 算相对误差                    | 与上游模板图形态一致 |
 
 判定阈值：轨迹偏差均值 < 2% 且 全程 loss 均值相对偏差 < 2%。
 
@@ -86,7 +86,7 @@ def median(values):
 
 
 def error_stats(values):
-    """四项误差统计（官方性能报告模板口径：Mean / MSE / Max / Min，百分比）"""
+    """四项误差统计（上游性能报告模板口径：Mean / MSE / Max / Min，百分比）"""
     vals = [v for v in values if v is not None]
     if not vals:
         return None
@@ -94,7 +94,7 @@ def error_stats(values):
     return {
         "n": n,
         "mean_error_pct": round(sum(vals) / n, 4),
-        # MSE 为「百分比误差的平方」的均值，量纲 %²，与官方模板定义一致
+        # MSE 为「百分比误差的平方」的均值，量纲 %²，与上游模板定义一致
         "mse_error_pct2": round(sum(v * v for v in vals) / n, 4),
         "max_error_pct": round(max(vals), 4),
         "min_error_pct": round(min(vals), 4),
@@ -242,7 +242,7 @@ def compare_accuracy(baseline_log, optimized_log, output_path=None, ma_window=MA
             "optimized_throughput": optimized["summary"].get("samples_per_second"),
         }
 
-    # ---- 画图（官方模板形态：loss 对比 + 误差针状图含 2% 阈值线）----
+    # ---- 画图（上游模板形态：loss 对比 + 误差针状图含 2% 阈值线）----
     try:
         import matplotlib
         matplotlib.use("Agg")

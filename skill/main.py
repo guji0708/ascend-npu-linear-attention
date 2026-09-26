@@ -23,11 +23,11 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 REPO_DIR = BASE_DIR.parent / "MindSpeed-MM"
 
-# 精度对齐轮步数（复现官方精度日志）
+# 精度对齐轮步数（复现参考精度日志）
 ACCURACY_ITERS = 100
-# 性能轮步数：官方脚本取第 101-200 步均值，故必须 >= 200
+# 性能轮步数：上游示例脚本取第 101-200 步均值，故必须 >= 200
 PERF_ITERS = 200
-# 官方精度日志对应的数据规模
+# 参考精度日志对应的数据规模
 OFFICIAL_MAX_SAMPLES = 1000
 OFFICIAL_GRAD_ACCUM = 8
 
@@ -127,13 +127,13 @@ def step3_generate_config(hf_dir, dcp_dir, data_dir, output_path, npus=1,
                           gdn=None, train_iters=None):
     """生成Qwen3.5-0.8B训练配置文件
 
-    从官方配置模板派生，并覆盖全部经验证的环境适配项与路径。
+    从上游配置模板派生，并覆盖全部经验证的环境适配项与路径。
     """
     print("\n[Step 3] 生成训练配置文件")
     import yaml
 
     output_path = Path(output_path).resolve()
-    # 官方 master 仓库只有 4B 模板，0.8B 配置由它派生（字段结构完全同构）
+    # 上游 master 仓库只有 4B 模板，0.8B 配置由它派生（字段结构完全同构）
     template_path = REPO_DIR / "examples" / "qwen3_5" / "qwen3_5_0.8B_config.yaml"
     if not template_path.exists():
         template_path = REPO_DIR / "examples" / "qwen3_5" / "qwen3_5_4B_config.yaml"
@@ -159,7 +159,7 @@ def step3_generate_config(hf_dir, dcp_dir, data_dir, output_path, npus=1,
     if dataset_json is None:
         raise FileNotFoundError(
             f"在 {data_dir} 中未找到 annotations_slim.json 或 "
-            f"mllm_format_llava_instruct_data.json，请先上传官方数据集并解压")
+            f"mllm_format_llava_instruct_data.json，请先准备数据集并解压")
     config["data"]["dataset_param"]["basic_parameters"]["dataset_dir"] = str(data_dir) + "/"
     config["data"]["dataset_param"]["basic_parameters"]["dataset"] = str(dataset_json)
     print(f"  数据集标注: {dataset_json}")
@@ -197,7 +197,7 @@ def step3_generate_config(hf_dir, dcp_dir, data_dir, output_path, npus=1,
 
     print(f"  配置已生成: {output_path}")
     print(f"  train_iters = {config['training']['train_iters']}"
-          f"（性能轮需 >= {PERF_ITERS}，官方取第 101-{PERF_ITERS} 步）")
+          f"（性能轮需 >= {PERF_ITERS}，上游示例取第 101-{PERF_ITERS} 步）")
     return str(output_path)
 
 
@@ -265,11 +265,11 @@ def main():
         epilog="""
 使用示例:
   # 精度对齐轮（100 步）
-  python main.py --all --npus 1 --data-dir /workspace/c4ai/dataset \\
-      --hf-dir /workspace/c4ai/ckpt/hf_path/Qwen3.5-0.8B \\
-      --dcp-dir /workspace/c4ai/ckpt/dcp_path/Qwen3.5-0.8B
+  python main.py --all --npus 1 --data-dir /workspace/ascend_ws/dataset \\
+      --hf-dir /workspace/ascend_ws/ckpt/hf_path/Qwen3.5-0.8B \\
+      --dcp-dir /workspace/ascend_ws/ckpt/dcp_path/Qwen3.5-0.8B
 
-  # 性能轮（200 步，官方取第 101-200 步均值）
+  # 性能轮（200 步，上游示例取第 101-200 步均值）
   python main.py --train --train-iters 200 --npus 1
 
   # 仅下载模型
