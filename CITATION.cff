@@ -1,14 +1,15 @@
 cff-version: 1.2.0
 message: "如果本工作对你的研究有帮助，请按以下格式引用。"
-title: "慧眼 · 智慧农业：面向昇腾 NPU 的线性注意力算子优化与农业多模态落地"
+title: "昇腾 NPU 线性注意力算子优化与多模态微调"
 type: software
 abstract: >-
   把 Qwen3.5-0.8B 多模态模型迁移到昇腾 NPU（MindSpeed-MM + FSDP2），并将 GDN（Gated DeltaNet）
-  线性注意力算子由纯 PyTorch 的 eager 路径替换为原生 AscendC 实现。官方口径（第 101–200 步单步耗时均值）
+  线性注意力算子由纯 PyTorch 的 eager 路径替换为原生 AscendC 实现。统一口径（第 101–200 步单步耗时均值）
   由 12498.1 ms 降至 3624.2 ms，加速比 3.45×；1000 步轨迹偏差 1.0613%、全程 loss 均值相对偏差 0.2205%，
   均低于 2% 阈值。
 authors:
-  - name: "慧眼智农（Huiyan Smart Agriculture Team）"
+  - name: "guji0708"
+    alias: "guji0708"
 version: "1.0.0"
 date-released: "2026-09-26"
 license: "Apache-2.0"
@@ -18,5 +19,5 @@ keywords:
   - 线性注意力
   - Gated DeltaNet
   - 多模态大模型
-  - 智慧农业
-repository-code: "https://github.com/guji0708/huiyan-smart-agriculture"
+  - 算子优化
+repository-code: "https://github.com/guji0708/ascend-npu-linear-attention"

@@ -1,7 +1,6 @@
-# 慧眼 · 智慧农业（Huiyan Smart Agriculture）
+# 昇腾 NPU 线性注意力算子优化与多模态微调
 
-> 面向农业一线的多模态病虫害诊断与处方系统，跑在国产昇腾 NPU 上。
-> C4-AI 中国高校计算机大赛 · 人工智能创意赛 · 昇腾赛道 · 参赛队伍「慧眼智农」
+> 把 Qwen3.5-0.8B 多模态模型迁移到昇腾 NPU，并把计算最重的线性注意力算子由纯 PyTorch 路径换成昇腾原生 AscendC 实现。
 
 [English](#english) | 中文
 
@@ -11,14 +10,16 @@
 
 一套**可运行、可复现**的昇腾 NPU 微调流水线，以及为跑通它所沉淀的**环境适配工具链**。
 
-核心命题：让「拍照即诊断、诊断即处方」落到田间地头，前提是大模型能在国产算力上跑得动、跑得稳、跑得快。为此本项目完成了两件事：
+核心命题：让大模型在国产算力上跑得动、跑得稳、跑得快。为此本项目完成了两件事：
 
 1. **把 Qwen3.5-0.8B 多模态模型完整迁移到昇腾 NPU**（MindSpeed-MM + FSDP2）；
 2. **对计算最重的线性注意力算子做算子级替换**：GDN（Gated DeltaNet）由纯 PyTorch 的 `eager` 路径切换到昇腾原生 **AscendC** 实现。
 
+`skill/` 里带一条完整的示例链路，用来证明整条路能跑通：以**作物病虫害图像问答**为场景，从数据构造、领域微调、指标采集一直到 Gradio 图文问答演示，全程可执行。示例场景与算子优化是两件独立的事——算子层可以脱离示例单独复现。
+
 ## 实测结果
 
-**性能**（官方口径：第 101–200 步单步耗时均值）
+**性能**（统一口径：第 101–200 步单步耗时均值）
 
 | 轮次 | 算子配置 | `STEP_TIME` | `samples/s` | 加速比 |
 |---|---|---|---|---|
@@ -36,7 +37,7 @@
 | 轨迹偏差（50 步滑动均值，主判据） | **1.0613%** | 2.3604 | 4.6311% | 0.0001% |
 | 逐点相对误差（参考） | 3.9181% | 55.9654 | 72.7794% | 0.0014% |
 
-判定 **PASS**：轨迹偏差均值 1.0613% 与全程 loss 均值相对偏差 0.2205%，均低于 2% 阈值。
+判定 **通过**：轨迹偏差均值 1.0613% 与全程 loss 均值相对偏差 0.2205%，均低于 2% 阈值。
 
 > 为什么以轨迹偏差为主判据：逐点相对误差的分母是单步瞬时 loss，而单步 loss 自身波动中位数（噪声地板）就有 **16.279%**，且收敛后 loss 趋近 0。**2% 这条阈值线本身落在噪声地板以下**，逐点口径不具备判定能力。详见 `docs/环境适配问题与解法.md`。
 
@@ -81,7 +82,7 @@ python main.py --all --npus 1 \
 也可分步执行：`--download` / `--convert` / `--config-gen` / `--train` / `--collect`。
 
 > **从空环境到跑出可复算指标的完整步骤**（软件环境 → 资产 → 算子 → 自检 → 训练 → 复算）见 [`docs/复现指南.md`](docs/复现指南.md)。
-> 仓库内脚本默认工作根目录为 `/workspace/c4ai`，可用环境变量 `C4AI_WORK` 覆盖。
+> 仓库内脚本默认工作根目录为 `/workspace/ascend_ws`，可用环境变量 `ASCEND_WORK` 覆盖。
 
 `main.py` 会自动探测 `fla_npu` 是否可用：探测到则走 `ascendc`，否则回落到 `eager`。
 （**不要**用 `triton` 兜底 —— triton-ascend 3.2.0 的 JIT 在 CANN 9.0.0 上编译必然失败，见下文。）
@@ -89,8 +90,8 @@ python main.py --all --npus 1 \
 ### 复现指标
 
 ```bash
-# 官方口径性能指标（第 101-200 步均值 + 加速比）
-bash scripts/summary_official.sh logs/train_eager1000.log logs/train_ascendc1000.log
+# 统一口径性能指标（第 101-200 步均值 + 加速比）
+bash scripts/summary_metric.sh logs/train_eager1000.log logs/train_ascendc1000.log
 
 # 精度对齐：四项误差统计 + 对比图
 python skill/compare_accuracy.py logs/train_eager1000.log logs/train_ascendc1000.log \
@@ -102,12 +103,12 @@ python skill/compare_accuracy.py logs/train_eager1000.log logs/train_ascendc1000
 ## 目录结构
 
 ```
-├── skill/                        可运行的微调 Skill
+├── skill/                        可运行的微调 Skill（作物图像问答示例）
 │   ├── main.py                   主流水线：下载 → 转换 → 配置 → 训练 → 采集
 │   ├── prepare_data.py           数据集预处理（random.seed(42) 是两轮可比的前提）
 │   ├── compare_accuracy.py       精度对齐（轨迹偏差为主判据）
-│   ├── perf_collector.py         指标提取（官方口径）
-│   └── demo.py                   Gradio 推理演示
+│   ├── perf_collector.py         指标提取（统一口径）
+│   └── demo.py                   Gradio 图文问答演示
 ├── configs/                      训练配置
 │   ├── qwen3_5_0.8B_config.yaml  0.8B 主实验配置
 │   ├── qwen3_5_4B_config.yaml    4B 扩展配置
@@ -129,9 +130,9 @@ python skill/compare_accuracy.py logs/train_eager1000.log logs/train_ascendc1000
 │   └── whats_wrong.sh            故障诊断
 ├── scripts/                      消融驱动与指标复算
 │   ├── run_round.sh              单轮训练驱动
-│   ├── summary_official.sh       官方口径指标复算（与官方评测脚本逐字一致）
+│   ├── summary_metric.sh         统一口径指标复算（与上游示例脚本口径一致）
 │   ├── make_report.py            出图与统计（按步号锚定对齐）
-│   └── make_proposal_figs.py     架构图 / 收敛曲线 / 甘特图
+│   └── make_figures.py           架构图 / 收敛曲线
 └── docs/
     ├── 复现指南.md               从空环境到跑出可复算指标的全过程 ← 先读这个
     ├── 环境适配问题与解法.md       5 个阻断性问题的因果链
@@ -144,7 +145,7 @@ python skill/compare_accuracy.py logs/train_eager1000.log logs/train_ascendc1000
 
 - `docs/figures/report_accuracy.png` —— 精度对齐：Loss 收敛对比 + 逐步相对误差（含 2% 阈值线与噪声地板）+ 轨迹偏差 + 误差归因 + 四项统计
 - `docs/figures/report_loss_all_rounds.png` —— 四轮 Loss 收敛曲线叠加
-- `docs/figures/proposal_arch.png` —— 系统技术架构
+- `docs/figures/arch.png` —— 系统技术架构
 
 三张图都由 `scripts/` 下的脚本从原始训练日志直接生成，可复算。
 
@@ -189,11 +190,11 @@ python skill/compare_accuracy.py logs/train_eager1000.log logs/train_ascendc1000
 
 ## English
 
-**Huiyan Smart Agriculture** is a multimodal crop pest/disease diagnosis and prescription system running on Ascend NPUs.
+Porting **Qwen3.5-0.8B** (multimodal) to Ascend via MindSpeed-MM + FSDP2, and replacing the heaviest linear-attention operators with native AscendC implementations. The **GDN (Gated DeltaNet)** layer moves from the pure-PyTorch `eager` path to a fused **AscendC** operator.
 
-The core engineering work: porting **Qwen3.5-0.8B** (multimodal) to Ascend via MindSpeed-MM + FSDP2, and replacing the heaviest linear-attention operators with native AscendC implementations. The **GDN (Gated DeltaNet)** layer moves from the pure-PyTorch `eager` path to a fused **AscendC** operator.
+`skill/` ships a complete end-to-end example (crop disease image QA) covering data preparation, domain fine-tuning, metric collection and a Gradio demo — evidence that the whole pipeline runs, not just the operator layer.
 
-**Results** (official window: mean step time over iterations 101–200):
+**Results** (common window: mean step time over iterations 101–200):
 
 | Round | Operator config | `STEP_TIME` | Speedup |
 |---|---|---|---|
@@ -216,7 +217,7 @@ cd skill && python main.py --all --npus 1 --data-dir <dataset> --hf-dir <hf_weig
 
 ## 第三方依赖与许可
 
-本仓库的 Apache-2.0 仅覆盖本团队独立开发的代码与文档。下列组件是外部依赖，不随本仓库分发，各自遵循其原始许可证：
+本仓库的 Apache-2.0 仅覆盖独立开发的代码与文档。下列组件是外部依赖，不随本仓库分发，各自遵循其原始许可证：
 
 | 组件 | 在本项目中的角色 | 许可证 |
 |---|---|---|
@@ -226,12 +227,10 @@ cd skill && python main.py --all --npus 1 --data-dir <dataset> --hf-dir <hf_weig
 | CANN / torch_npu | 昇腾基础软件栈 | 华为软件许可协议 |
 | Qwen3.5-0.8B | 基座模型 | 见模型主页；本仓库不分发权重 |
 
-`ascend_porting/` 下的补丁脚本在运行时读取并修改上述组件的源码（按字符串标记插入或删除），不复制、不再分发其源码，因此不构成衍生作品；补丁中新增的代码为本团队原创。`console/install_fla_npu.sh` 从上游仓库克隆源码，不附带任何上游代码副本。
+`ascend_porting/` 下的补丁脚本在运行时读取并修改上述组件的源码（按字符串标记插入或删除），不复制、不再分发其源码，因此不构成衍生作品；补丁中新增的代码为原创。`console/install_fla_npu.sh` 从上游仓库克隆源码，不附带任何上游代码副本。
 
 模型权重、数据集、编译产物（`*.so` / `*.whl` / `*.tar.gz`）均已列入 `.gitignore`，不入库。
 
 ## 许可
 
 本项目以 **Apache License 2.0** 发布，全文见 [`LICENSE`](LICENSE)。选择 Apache-2.0 的原因：与昇腾生态（CANN、MindSpeed 等）主流许可证一致，含明确专利授权条款，且与上游 `flash-linear-attention-npu` 的多许可模式（原创代码 BSD-3-Clause）兼容，便于后续向社区回馈修改。
-
-本仓库同时作为 C4-AI 中国高校计算机大赛 · 人工智能创意赛 · 昇腾赛道的参赛作品开源。

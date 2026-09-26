@@ -1,4 +1,4 @@
-# 慧眼 · 智慧农业 —— Skill 依赖清单（复赛版）
+# Skill 依赖清单（昇腾 NPU 环境）
 # 环境基线：Ascend910_9382 / CANN 9.0.0 / Python 3.11.15 / torch 2.10.0 / torch_npu 2.10.0
 #
 # 适用对象：skill/ 目录下的五个脚本
