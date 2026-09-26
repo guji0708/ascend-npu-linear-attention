@@ -1,5 +1,5 @@
 #!/bin/bash
-# 跑一轮训练（200 步，官方性能口径需要 >= 200 步）
+# 跑一轮训练（200 步，统一性能口径需要 >= 200 步）
 # 用法: bash run_round.sh <eager|ascendc>
 #   eager   —— 基线轮（纯 PyTorch 实现，无需额外算子库）
 #   ascendc —— 优化轮（需先装 fla_npu）
@@ -13,7 +13,7 @@ if [ "$MODE" != "eager" ] && [ "$MODE" != "ascendc" ]; then
   exit 1
 fi
 
-REPO="${C4AI_WORK:-/workspace/c4ai}/MindSpeed-MM"
+REPO="${ASCEND_WORK:-/workspace/ascend_ws}/MindSpeed-MM"
 PY=/usr/local/python3.11.15/bin/python
 ITERS=200
 LOG="$REPO/logs/train_${MODE}_${ITERS}.log"

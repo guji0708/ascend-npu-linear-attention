@@ -4,7 +4,7 @@
 ============================================================
 输入: 训练日志（可多份）
 输出:
-  report_accuracy.png         官方模板形态: 上 loss 对比 + 下误差针状图 + 底部四项统计
+  report_accuracy.png         上游模板形态: 上 loss 对比 + 下误差针状图 + 底部四项统计
   report_loss_all_rounds.png  各轮 loss 收敛曲线叠加
   report_stats.md             数字表格（可直接抄进报告）
   report_data.json            原始数据（可追溯）
@@ -49,7 +49,7 @@ RE_TIME = re.compile(
 RE_TIME_ALT = re.compile(r"elapsed\s*[:=]?\s*([0-9]+\.?[0-9]*)\s*ms", re.IGNORECASE)
 RE_GBS = re.compile(r"global\s+batch\s+size\s*[:=]\s*(\d+)", re.IGNORECASE)
 
-# 官方口径: 取第 101-200 步均值。千步轮想取更长窗口用 --window 101 1000
+# 统一口径: 取第 101-200 步均值。千步轮想取更长窗口用 --window 101 1000
 WINDOW = (101, 200)
 
 # 逐点相对误差的滑动平均窗口 —— 精度对齐的主判据口径
@@ -166,7 +166,7 @@ def parse_log(path):
 
 
 def step_time_stats(recs, window=WINDOW):
-    """官方口径: 第 101-200 步均值；不足则降级并明说"""
+    """统一口径: 第 101-200 步均值；不足则降级并明说"""
     times = [recs[s]["time"] for s in range(window[0], window[1] + 1)
              if s in recs and recs[s]["time"] is not None]
     if times:
@@ -290,7 +290,7 @@ def err_vs_loss(steps, bl, ol, errs):
 
 
 def fig_accuracy(base_key, opt_key, rounds, out_png):
-    """官方模板形态 + 双口径。
+    """上游模板形态 + 双口径。
 
     上: loss 收敛对比
     中: 逐步相对误差针状图 + 2% 阈值线 + 滑动平均 + 噪声地板
@@ -543,7 +543,7 @@ def write_md(rounds, acc, out_md):
                  f"优化 {agg['optimized_loss_mean']:.6f}，相对偏差 **{agg['relative_error_pct']:.4f}%**")
         L.append(f"- 噪声地板（同一轮训练自身相邻两步波动的中位数）: "
                  f"**{acc['noise_floor_pct']:.3f}%**\n")
-        L.append("> MSE 为「百分比误差的平方」的均值，量纲是 %²，与官方模板的 Mean Square Error 一致。")
+        L.append("> MSE 为「百分比误差的平方」的均值，量纲是 %²，与上游模板的 Mean Square Error 一致。")
         L.append("> 逐点口径的分母是单步瞬时 loss，而单步 loss 的自身波动中位数就有 "
                  f"{acc['noise_floor_pct']:.1f}%（噪声地板），且收敛后 loss 趋近 0 —— 2% 这条线本身落在"
                  "噪声地板以下，逐点口径不具备判定能力，故以轨迹偏差口径为主判据。\n")
@@ -629,7 +629,7 @@ def main():
     ap.add_argument("--outdir", default=None, help="输出目录，默认取第一份日志所在目录")
     ap.add_argument("--window", nargs=2, type=int, metavar=("START", "END"),
                     default=list(WINDOW),
-                    help="STEP_TIME 统计窗口，默认 101 200（官方口径）。"
+                    help="STEP_TIME 统计窗口，默认 101 200（统一口径）。"
                          "千步轮可传 --window 101 1000 取更长窗口")
     ap.add_argument("--selftest", action="store_true", help="用合成日志自检")
     args = ap.parse_args()
