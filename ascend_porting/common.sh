@@ -6,7 +6,7 @@
 set -u
 
 # ---------- 固定路径（新环境如与旧环境不同，只改这里） ----------
-export WORK=/workspace/c4ai
+export WORK=/workspace/ascend_ws
 export REPO=$WORK/MindSpeed-MM
 export PY=/usr/local/python3.11.15/bin/python
 export CANN_ENV=/usr/local/Ascend/cann/set_env.sh

@@ -24,7 +24,7 @@ MindSpeed-MM 按上游 flash-linear-attention 的签名传参，会带
 三种加载方式（任一即可）
 ------------------------
 1) 自动（推荐）：本文件被复制到 site-packages，并配一个 .pth：
-       c4ai_fla_compat.pth  内容: import npu_ops_compat
+       ascend_fla_compat.pth  内容: import npu_ops_compat
    再设环境变量 FLA_NPU_COMPAT=1，则所有 Python 进程自动生效。
 2) 手动：import npu_ops_compat; npu_ops_compat.install()
 3) 直接跑：python3 npu_ops_compat.py --selftest
@@ -97,7 +97,7 @@ def _wrap(name, fn):
     wrapper.__name__ = getattr(fn, "__name__", name)
     wrapper.__doc__ = getattr(fn, "__doc__", None)
     wrapper.__wrapped__ = fn
-    wrapper.__c4ai_fla_compat__ = name
+    wrapper.__fla_compat__ = name
     return wrapper
 
 
@@ -167,7 +167,7 @@ def _patch_namespace_class():
     NS = getattr(_ops, "_OpNamespace", None)
     if NS is None:
         return False
-    if getattr(NS, "_c4ai_fla_compat_patched", False):
+    if getattr(NS, "_fla_compat_patched", False):
         _PATCHED = True
         return True
 
@@ -197,7 +197,7 @@ def _patch_namespace_class():
         return w
 
     NS.__getattr__ = __getattr__
-    NS._c4ai_fla_compat_patched = True
+    NS._fla_compat_patched = True
     _PATCHED = True
     return True
 
@@ -233,7 +233,7 @@ def is_active():
         import importlib
 
         NS = importlib.import_module("torch._ops")._OpNamespace
-        return bool(getattr(NS, "_c4ai_fla_compat_patched", False))
+        return bool(getattr(NS, "_fla_compat_patched", False))
     except Exception:
         return False
 
@@ -245,7 +245,7 @@ class _TorchFinder:
     这样避免在 site 初始化阶段就 import torch（重且易出问题）。
     """
 
-    _c4ai_fla_compat_finder = True
+    _fla_compat_finder = True
 
     def __init__(self):
         self._done = False
@@ -293,7 +293,7 @@ def _boot():
     if os.environ.get(ENV_FLAG) != "1":
         return
     for f in sys.meta_path:
-        if getattr(f, "_c4ai_fla_compat_finder", False):
+        if getattr(f, "_fla_compat_finder", False):
             return
     sys.meta_path.insert(0, _TorchFinder())
 
@@ -331,7 +331,7 @@ def _selftest():
         try:
             fn = getattr(torch.ops.npu, k)
             print("  [OK]   torch.ops.npu.%-28s -> %s"
-                  % (k, getattr(fn, "__c4ai_fla_compat__", "?")))
+                  % (k, getattr(fn, "__fla_compat__", "?")))
         except AttributeError:
             print("  [FAIL] torch.ops.npu.%s 取不到（ascendc 回落未生效）" % k)
             return 1

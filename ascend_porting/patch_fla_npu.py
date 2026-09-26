@@ -28,8 +28,12 @@ import os
 import re
 import sys
 
-MARK_BEGIN = "// ---- c4ai patch: npu_fast_gelu_custom ----"
-MARK_END = "// ---- end c4ai patch ----"
+MARK_BEGIN = "// ---- ascend patch: npu_fast_gelu_custom ----"
+MARK_END = "// ---- end ascend patch ----"
+
+# 幂等判断用的宽松匹配：早期版本写入源码的标记前缀不同（不是 ascend），
+# 用正则兼容，避免在已打过补丁的源码上重复插入。
+MARK_ANY = re.compile(r"// ---- \w+ patch: npu_fast_gelu_custom ----")
 
 GELU_DEFS = f"""{MARK_BEGIN}
 at::Tensor npu_fast_gelu_custom(const at::Tensor &self) {{
@@ -85,7 +89,7 @@ def patch_gelu_defs(fla_dir, dry=False):
         return "skip", f"找不到 {OPAPI_REL}"
 
     text = read(path)
-    if MARK_BEGIN in text:
+    if MARK_ANY.search(text):
         return "done", "P1 已打过（幂等跳过）"
 
     close = namespace_close_line(text, "op_api")
