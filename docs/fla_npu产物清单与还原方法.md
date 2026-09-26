@@ -60,9 +60,9 @@ TIER = 'a2'
 | 文件 | 大小 | 作用 |
 |---|---|---|
 | `fla_npu_opp_env.pth` | 23 B | 挂载 OPP 环境路径（AscendC 算子被找到的前提） |
-| `c4ai_fla_compat.pth` | 22 B | 算子传参兼容垫片的自动加载钩子（注意：**没有**前导下划线） |
+| `ascend_fla_compat.pth` | 22 B | 算子传参兼容垫片的自动加载钩子（注意：**没有**前导下划线） |
 
-> 导出时只需要包本体与 `fla_npu_opp_env.pth`；`c4ai_fla_compat.pth` 由
+> 导出时只需要包本体与 `fla_npu_opp_env.pth`；`ascend_fla_compat.pth` 由
 > `ascend_porting/npu_ops_compat.py` 的安装流程生成，会随环境搭建自动重建。
 
 ### 为什么没有 `.whl` 和 `.run`
@@ -160,9 +160,9 @@ PY
 第 2 级最常用（NPU 机器通常无法直连 GitHub）：
 
 ```bash
-mkdir -p /workspace/c4ai/flash-linear-attention-npu
-tar xzf fla_npu_src.tar.gz -C /workspace/c4ai/flash-linear-attention-npu --strip-components=1
-cd /workspace/c4ai/flash-linear-attention-npu
+mkdir -p /workspace/ascend_ws/flash-linear-attention-npu
+tar xzf fla_npu_src.tar.gz -C /workspace/ascend_ws/flash-linear-attention-npu --strip-components=1
+cd /workspace/ascend_ws/flash-linear-attention-npu
 git init -q && git add -A && git commit -qm src
 bash /path/to/repo/console/install_fla_npu.sh
 ```
