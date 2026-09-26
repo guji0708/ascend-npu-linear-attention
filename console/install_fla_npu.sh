@@ -2,10 +2,10 @@
 # 安装 fla_npu 算子库（ascendc 优化轮的前置条件）
 # 用法: bash install_fla_npu.sh
 # 若 GitHub 不通，可指定镜像: REPO_URL=<镜像地址> bash install_fla_npu.sh
-# 全程日志: /workspace/c4ai/fla_npu_install.log
+# 全程日志: /workspace/ascend_ws/fla_npu_install.log
 set -u
 PY=/usr/local/python3.11.15/bin/python
-WORK=/workspace/c4ai
+WORK=/workspace/ascend_ws
 REPO_URL="${REPO_URL:-https://github.com/flashserve/flash-linear-attention-npu.git}"
 SRC_DIR="$WORK/flash-linear-attention-npu"
 LOG="$WORK/fla_npu_install.log"

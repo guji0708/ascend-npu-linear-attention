@@ -26,7 +26,7 @@ set -u
 PY="${PY:-/usr/local/python3.11.15/bin/python}"
 [ -x "$PY" ] || PY="$(command -v python3 || command -v python || true)"
 
-WORK="${C4AI_WORK:-/workspace/c4ai}"
+WORK="${ASCEND_WORK:-/workspace/ascend_ws}"
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ok()   { echo "  [OK]   $*"; }

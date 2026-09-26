@@ -13,7 +13,7 @@
 # ============================================================
 set -u
 
-WORK="${C4AI_WORK:-/workspace/c4ai}"
+WORK="${ASCEND_WORK:-/workspace/ascend_ws}"
 REPO=$WORK/MindSpeed-MM
 PY=/usr/local/python3.11.15/bin/python
 PIP_MIRROR=https://repo.huaweicloud.com/repository/pypi/simple/
@@ -72,14 +72,14 @@ echo "=== 6) 约束文件：锁死 transformers / torch / torch_npu / numpy ==="
 T=$($PY -c "import torch;print(torch.__version__)" 2>/dev/null || echo "?")
 N=$($PY -c "import torch_npu;print(torch_npu.__version__)" 2>/dev/null || echo "?")
 U=$($PY -c "import numpy;print(numpy.__version__)" 2>/dev/null || echo "?")
-printf 'transformers==5.2.0\ntorch==%s\ntorch_npu==%s\nnumpy==%s\n' "$T" "$N" "$U" > /tmp/c4ai_constraints.txt
-cat /tmp/c4ai_constraints.txt | sed 's/^/  /'
+printf 'transformers==5.2.0\ntorch==%s\ntorch_npu==%s\nnumpy==%s\n' "$T" "$N" "$U" > /tmp/ascend_constraints.txt
+cat /tmp/ascend_constraints.txt | sed 's/^/  /'
 
 echo
 echo "=== 7) 按名单补装依赖 ==="
 echo "  不要用 pip install -e .（transformers 4.57.0 vs 官方要求 5.2.0 死锁）"
 echo "  jsonargparse 必须带 [signatures] extra，否则 mm-convert 报 docstring-parser 缺失"
-$PY -m pip install -c /tmp/c4ai_constraints.txt \
+$PY -m pip install -c /tmp/ascend_constraints.txt \
   accelerate datasets ftfy "jsonargparse[signatures]" numba peft pydantic \
   qwen_vl_utils torchdata megatron-core diffusers modelscope 2>&1 | tail -5
 
@@ -121,7 +121,7 @@ echo " 软件环境重建完毕"
 echo "==================================================="
 echo
 echo "接下来还要恢复资产（本脚本不代做）："
-echo "  1. HF 权重   -> /workspace/c4ai/ckpt/hf_path/Qwen3.5-0.8B   （1.7G）"
+echo "  1. HF 权重   -> /workspace/ascend_ws/ckpt/hf_path/Qwen3.5-0.8B   （1.7G）"
 echo "  2. DCP 权重  -> mm-convert Qwen35Converter hf_to_dcp"
-echo "  3. 数据集    -> /workspace/c4ai/dataset                    （316M）"
+echo "  3. 数据集    -> /workspace/ascend_ws/dataset                    （316M）"
 echo "  详见 docs/复现指南.md"

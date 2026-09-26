@@ -2,13 +2,13 @@
 # 环境自检 —— 每次开机后先跑这个
 # 用法: bash health_check.sh
 set -u
-REPO="${C4AI_WORK:-/workspace/c4ai}/MindSpeed-MM"
+REPO="${ASCEND_WORK:-/workspace/ascend_ws}/MindSpeed-MM"
 PY=/usr/local/python3.11.15/bin/python
 export NON_MEGATRON=true
 ok=1
 
 echo "==================================================="
-echo " 慧眼·智慧农业 —— 昇腾环境自检"
+echo " 昇腾环境自检"
 echo " $(date '+%Y-%m-%d %H:%M:%S')"
 echo "==================================================="
 
@@ -38,7 +38,7 @@ for f in "$REPO/ckpt/hf_path/Qwen3.5-0.8B/config.json" \
          "$REPO/dataset/annotations_slim.json" \
          "$REPO/MindSpeed-MM" \
          "$REPO/mindspeed_mm/fsdp/train/trainer.py" \
-         "${C4AI_WORK:-/workspace/c4ai}/skill/main.py"; do
+         "${ASCEND_WORK:-/workspace/ascend_ws}/skill/main.py"; do
   if [ -e "$f" ]; then
     echo "  OK    $f"
   else

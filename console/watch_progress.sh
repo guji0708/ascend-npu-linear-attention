@@ -6,13 +6,13 @@ set -u
 LOG="${1:-}"
 if [ -z "$LOG" ]; then
   echo "用法: bash watch_progress.sh <日志文件路径>"
-  echo "例如: bash watch_progress.sh /workspace/c4ai/MindSpeed-MM/logs/train_eager_200.log"
+  echo "例如: bash watch_progress.sh /workspace/ascend_ws/MindSpeed-MM/logs/train_eager_200.log"
   exit 1
 fi
 if [ ! -f "$LOG" ]; then
   echo "[ERROR] 找不到日志文件: $LOG"
   echo "  可能这条训练还没启动，或者路径写错了。可用的日志："
-  ls -t /workspace/c4ai/MindSpeed-MM/logs/*.log 2>/dev/null | head -5 | sed 's/^/    /'
+  ls -t /workspace/ascend_ws/MindSpeed-MM/logs/*.log 2>/dev/null | head -5 | sed 's/^/    /'
   exit 1
 fi
 
@@ -47,7 +47,7 @@ echo
 echo "--- 最后 10 行 ---"
 tail -10 "$LOG"
 echo
-echo "→ 出官方口径指标:"
-echo "    bash scripts/summary_official.sh $LOG"
+echo "→ 出统一口径指标:"
+echo "    bash scripts/summary_metric.sh $LOG"
 echo "→ 若最后几行是报错，用:"
 echo "    bash console/whats_wrong.sh $LOG"

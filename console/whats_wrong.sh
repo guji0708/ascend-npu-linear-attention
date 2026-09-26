@@ -13,7 +13,7 @@ fi
 if [ ! -f "$LOG" ]; then
   echo "[ERROR] 找不到日志: $LOG"
   echo "  可用的日志:"
-  ls -t /workspace/c4ai/MindSpeed-MM/logs/*.log 2>/dev/null | head -5 | sed 's/^/    /'
+  ls -t /workspace/ascend_ws/MindSpeed-MM/logs/*.log 2>/dev/null | head -5 | sed 's/^/    /'
   exit 1
 fi
 
