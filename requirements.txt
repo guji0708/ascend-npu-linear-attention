@@ -1,0 +1,36 @@
+# 慧眼 · 智慧农业 —— Skill 依赖清单（复赛版）
+# 环境基线：Ascend910_9382 / CANN 9.0.0 / Python 3.11.15 / torch 2.10.0 / torch_npu 2.10.0
+#
+# 适用对象：skill/ 目录下的五个脚本
+#   main.py             主流水线（下载 → 转换 → 配置 → 训练 → 采集）
+#   prepare_data.py     数据集预处理（COCO 标注 → 指令微调样本）
+#   compare_accuracy.py 精度对齐对比与画图
+#   perf_collector.py   日志指标提取（STEP_TIME / GBS / samples/s）
+#   demo.py             Gradio 推理演示
+
+# ---------------------------------------------------------------- 必需
+# 训练链路
+pyyaml>=6.0                 # main.py 生成训练配置（config-gen）
+transformers>=4.57.0        # Qwen3.5-0.8B 模型加载
+torch>=2.0                  # 通常由昇腾镜像预置，无需 pip 安装
+torch_npu>=2.0              # 昇腾 NPU 适配，随 CANN 镜像提供
+
+# 数据与指标
+pycocotools>=2.0            # prepare_data.py 解析 COCO 标注（顶层 import，缺了直接 ImportError）
+numpy>=1.24                 # 全流程数值计算
+matplotlib>=3.7             # compare_accuracy.py 输出精度对齐图
+
+# 模型获取
+modelscope>=1.10            # 从 ModelScope 拉取 Qwen3.5-0.8B 权重
+
+# 演示界面
+gradio>=5.0                 # demo.py 网页推理演示
+Pillow>=10.0                # 图像读写与预处理
+
+# ---------------------------------------------------------------- 说明
+# 1. 不要用 `pip install -e .` 安装本目录 —— 依赖版本会与镜像预置的 torch/torch_npu 冲突。
+#    按本清单逐项补装即可（先在干净环境执行 `pip install -r requirements.txt`）。
+# 2. transformers 若被上游自动升到与镜像不匹配的版本，会破坏 torch_npu 的算子注册；
+#    装完请执行 `python -c "import torch, torch_npu; print(torch.npu.is_available())"` 校验。
+# 3. fla_npu 算子库（AscendC GDN 算子）不在 pip 生态内，需按 console/install_fla_npu.sh 从源码编译安装。
+#    未安装时 main.py 会自动探测并回落到 eager 路径（见 main.py: detect_gdn_implementation）。

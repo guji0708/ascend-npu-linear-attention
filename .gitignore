@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# 编译产物与本地环境
+*.so
+*.run
+*.whl
+generated/
+logs/
+*.log
+
+# 归档与数据（体积大，不入库）
+*.tar.gz
+*.zip
+dataset/
+ckpt/
+data/
+
+# 编辑器与系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
