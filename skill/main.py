@@ -7,7 +7,9 @@ Qwen3.5-0.8B 昇腾NPU迁移Skill - 主入口
   1. pyproject 的 requires-python 需放宽到 >=3.11,<3.13（镜像无 3.12，且不能换解释器）
   2. 依赖不能用 `pip install -e .`，需按名单补装（transformers 钉 4.57.0 与官方 5.2.0 冲突）
   3. 训练必须带 NON_MEGATRON=true（插件式 FSDP2 不走 Megatron 桥接）
-  4. gdn/causal_conv1d 不能用 triton（triton-ascend 的 npu_utils.cpp 在 CANN 9.0.0 上 JIT 编译失败）
+  4. triton 必须先打补丁才能用：triton-ascend 的 npu_utils.cpp 引用了 CANN 9.0.0 不存在的
+     RT_LIMIT_TYPE_SIMT_WARP_STACK_SIZE，打 ascend_porting/patch_triton.py 后可用
+     （B 参考轮与 Conv1d 隔离实验即走此路径）；不打补丁才退回 eager
   5. gdn 为 eager 时 skip_gdn_recompute / skip_flash_attn_recompute 必须为 False
   6. 仓库根需有 ckpt / dataset 软链接（配置里是相对路径）
 """
@@ -47,9 +49,9 @@ def detect_gdn_implementation():
     """自动选择 GDN 算子实现。
 
     ascendc 性能最佳，但需要编译安装 fla_npu 算子库；
-    未安装时若用 triton，会触发 triton-ascend 的 npu_utils.cpp JIT 编译，
-    该源码引用的 RT_LIMIT_TYPE_SIMT_WARP_STACK_SIZE 在 CANN 9.0.0 中不存在，
-    编译必然失败。因此探测不到 fla_npu 时退回 eager。
+    triton 可用，但必须先打 ascend_porting/patch_triton.py 补丁（triton-ascend 的
+    npu_utils.cpp 引用了 CANN 9.0.0 不存在的 RT_LIMIT_TYPE_SIMT_WARP_STACK_SIZE）；
+    探测不到 fla_npu 时默认退回 eager —— 那是零额外依赖的基线档，不是唯一可选项。
     """
     try:
         return "ascendc" if importlib.util.find_spec("fla_npu") is not None else "eager"
@@ -176,7 +178,8 @@ def step3_generate_config(hf_dir, dcp_dir, data_dir, output_path, npus=1,
         print("  gdn_implementation = ascendc（已检测到 fla_npu）")
     else:
         print("  gdn_implementation = eager"
-              "（未检测到 fla_npu，且 triton 与 CANN 9.0.0 不兼容）")
+              "（未检测到 fla_npu，默认退回零依赖的 eager 基线档；"
+              "若要跑 triton 需先打 ascend_porting/patch_triton.py）")
 
     # (2) eager 与 skip_*_recompute 互斥，否则 overwrite_transformer_config 直接抛 ValueError
     if gdn_impl != "ascendc":
