@@ -18,7 +18,7 @@ export FLA_DIR=$WORK/flash-linear-attention-npu
 export FLA_URL="${FLA_URL:-https://github.com/flashserve/flash-linear-attention-npu.git}"
 # 必须钉在含 stable-ABI + legacy extension 的版本上：
 # c2e3d83f（2026-07-10）没有 libfla_npu_stable.so / FLA_NPU_BUILD_LEGACY_EXTENSION / FLANpuPybind.cpp，
-# 03_fla_npu.sh 与 patch_fla_npu.py 全依赖这三样，钉错了第 3 步必然跑不通。
+# console/install_fla_npu.sh 与 ascend_porting/patch_fla_npu.py 全依赖这三样，钉错了第 3 步必然跑不通。
 export FLA_COMMIT="${FLA_COMMIT:-edfae99e}"
 export SOC="${SOC:-ascend910_93}"
 
@@ -47,7 +47,7 @@ source_cann() {
 }
 
 # ---------- 环境变量（每次新终端都要，写进 bashrc 免踩） ----------
-# FLA_NPU_COMPAT=1 会激活参数兼容垫片（见 patches/npu_ops_compat.py）。
+# FLA_NPU_COMPAT=1 会激活参数兼容垫片（见 ascend_porting/npu_ops_compat.py）。
 # 没有它，ascendc/triton 轮次会崩在 unexpected keyword argument 'save_new_value'。
 ensure_env() {
   export NON_MEGATRON=true
