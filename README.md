@@ -34,12 +34,13 @@
 
 | 口径 | Mean Error | MSE | Max Error | Min Error |
 |---|---|---|---|---|
+| 官方关键点（第 50 / 100 步） | **0.3239%** | 0.1733 | 0.5854% | 0.0623% |
 | 轨迹偏差（50 步滑动均值，主判据） | **1.0613%** | 2.3604 | 4.6311% | 0.0001% |
 | 逐点相对误差（参考） | 3.9181% | 55.9654 | 72.7794% | 0.0014% |
 
-判定 **通过**：轨迹偏差均值 1.0613% 与全程 loss 均值相对偏差 0.2205%，均低于 2% 阈值。
+判定 **通过（三项判据全部达标）**：官方关键点第 50 步 0.0623% / 第 100 步 0.5854%，轨迹偏差均值 1.0613%，全程 loss 均值相对偏差 0.2205%，均低于 2% 阈值。
 
-> 为什么以轨迹偏差为主判据：逐点相对误差的分母是单步瞬时 loss，而单步 loss 自身波动中位数（噪声地板）就有 **16.279%**，且收敛后 loss 趋近 0。**2% 这条阈值线本身落在噪声地板以下**，逐点口径不具备判定能力。详见 `docs/环境适配问题与解法.md`。
+> 为什么以这三项为判据：逐点相对误差的分母是单步瞬时 loss，而单步 loss 自身波动中位数（噪声地板）就有 **16.279%**，且收敛后 loss 趋近 0。**2% 这条阈值线本身落在噪声地板以下**，逐点口径不具备判定能力；`grad_norm` 同频抖动更大（自身噪声地板 **16.248%**、P95 68.4%），同样只作参考。详见 `docs/环境适配问题与解法.md`。
 
 ## 环境基线
 
@@ -85,7 +86,7 @@ python main.py --all --npus 1 \
 > 仓库内脚本默认工作根目录为 `/workspace/ascend_ws`，可用环境变量 `ASCEND_WORK` 覆盖。
 
 `main.py` 会自动探测 `fla_npu` 是否可用：探测到则走 `ascendc`，否则回落到 `eager`。
-（**不要**用 `triton` 兜底 —— triton-ascend 3.2.0 的 JIT 在 CANN 9.0.0 上编译必然失败，见下文。）
+（要用 `triton` 需先打 `ascend_porting/patch_triton.py` 补丁 —— triton-ascend 3.2.0 的 `npu_utils.cpp` 引用了 CANN 9.0.0 中不存在的枚举，见下文问题 2。）
 
 ### 复现指标
 
@@ -106,7 +107,7 @@ python skill/compare_accuracy.py logs/train_eager1000.log logs/train_ascendc1000
 ├── skill/                        可运行的微调 Skill（作物图像问答示例）
 │   ├── main.py                   主流水线：下载 → 转换 → 配置 → 训练 → 采集
 │   ├── prepare_data.py           数据集预处理（random.seed(42) 是两轮可比的前提）
-│   ├── compare_accuracy.py       精度对齐（轨迹偏差为主判据）
+│   ├── compare_accuracy.py       精度对齐（三类口径判定）
 │   ├── perf_collector.py         指标提取（统一口径）
 │   └── demo.py                   Gradio 图文问答演示
 ├── configs/                      训练配置
@@ -143,8 +144,8 @@ python skill/compare_accuracy.py logs/train_eager1000.log logs/train_ascendc1000
 
 ## 结果图
 
-- `docs/figures/report_accuracy.png` —— 精度对齐：Loss 收敛对比 + 逐步相对误差（含 2% 阈值线与噪声地板）+ 轨迹偏差 + 误差归因 + 四项统计
-- `docs/figures/report_loss_all_rounds.png` —— 四轮 Loss 收敛曲线叠加
+- `docs/figures/report_accuracy.png` —— 精度对齐：Loss 收敛对比 + 逐步相对误差（含 2% 阈值线、噪声地板与官方关键点标注）+ 轨迹偏差 + 误差归因 + 三类口径四项统计
+- `docs/figures/report_loss_all_rounds.png` —— 各轮 Loss 收敛曲线叠加
 - `docs/figures/arch.png` —— 系统技术架构
 
 三张图都由 `scripts/` 下的脚本从原始训练日志直接生成，可复算。
@@ -165,15 +166,18 @@ python skill/compare_accuracy.py logs/train_eager1000.log logs/train_ascendc1000
 
 ## 消融设计
 
-四轮**背靠背相邻执行**（中间不插入其他任务），共用同一张卡，避免跨时段环境竞争噪声。除下表字段外配置完全一致：
+各轮**背靠背相邻执行**（中间不插入其他任务），共用同一张卡，避免跨时段环境竞争噪声。除下表字段外配置完全一致：
 
-| 字段 | A 基线 | C 优化 | D 优化+跳重计算 | B 参考 |
-|---|---|---|---|---|
-| `gdn_implementation` | `eager` | `ascendc` | `ascendc` | `triton` |
-| `skip_gdn_recompute` | `False` | `False` | `True` | `False` |
-| `train_iters` | 1000 | 1000 | 200 | 200 |
+| 字段 | A 基线 | A' 隔离 | C 优化 | D 优化+跳重计算 | B 参考 |
+|---|---|---|---|---|---|
+| `gdn_implementation` | `eager` | `eager` | `ascendc` | `ascendc` | `triton` |
+| `causal_conv1d_implementation` | `eager` | `triton` | 由框架升级为 `triton_with_transpose` | 同 C | `triton` |
+| `skip_gdn_recompute` | `False` | `False` | `False` | `True` | `False` |
+| `train_iters` | 1000 | 200 | 1000 | 200 | 200 |
 
-**A→C 隔离算子替换的贡献，C→D 隔离跳过重计算的贡献。**
+**A→A' 隔离 Causal Conv1d 的贡献，A'→C 隔离 GDN 的贡献，C→D 隔离跳过重计算的贡献。**
+
+A→C 一轮同时更换了 GDN 与 Causal Conv1d 两项实现，因此「3.45× 全部来自 GDN」只能算推断。A' 轮把算子替换的收益拆到**单个算子**：三轮同机背靠背重跑 200 步后，**GDN 的 AscendC 实现贡献 3.55×**，而 **Causal Conv1d 由 `eager` 换 `triton` 未观察到正收益（0.98×）**——它由 `triton` 升为 `triton_with_transpose` 是框架为匹配 AscendC GDN 的数据布局而强制的。故加速主体确认来自 GDN 的 AscendC 实现。
 
 两点必须说明的限制：
 
@@ -202,7 +206,7 @@ Porting **Qwen3.5-0.8B** (multimodal) to Ascend via MindSpeed-MM + FSDP2, and re
 | **C optimized** | GDN=`ascendc` | **3624.2 ms** | **3.45×** |
 | B reference | GDN=`triton` | 4071.7 ms | 3.07× |
 
-**71.0%** lower step time. Accuracy alignment over 1000 aligned steps: trajectory bias **1.0613%** (main criterion, 50-step moving average), aggregate loss deviation **0.2205%** — both under the 2% threshold.
+**71.0%** lower step time. Accuracy alignment over 1000 aligned steps passes on all three criteria: official key steps (**0.0623%** at step 50, **0.5854%** at step 100), trajectory bias **1.0613%** (50-step moving average), and aggregate loss deviation **0.2205%** — all under the 2% threshold.
 
 Also included: a porting toolchain (`ascend_porting/`) resolving five blocking CANN 9.0.0 issues, and a documented restore procedure for the compiled `fla_npu` operator artifacts.
 
@@ -211,7 +215,7 @@ pip install -r requirements.txt
 cd skill && python main.py --all --npus 1 --data-dir <dataset> --hf-dir <hf_weights> --dcp-dir <dcp_weights>
 ```
 
-`main.py` auto-detects `fla_npu`; if absent it falls back to `eager`. Do **not** fall back to `triton` — triton-ascend 3.2.0's JIT fails to compile against CANN 9.0.0 (issue #2 above).
+`main.py` auto-detects `fla_npu`; if absent it falls back to `eager`, the zero-dependency baseline. `triton` is also usable, but only after applying `ascend_porting/patch_triton.py` (see issue #2 above).
 
 ---
 
