@@ -4,7 +4,7 @@
 ============================================================
 输入: 训练日志（可多份）
 输出:
-  report_accuracy.png         上游模板形态: 上 loss 对比 + 下误差针状图 + 底部四项统计
+  report_accuracy.png         官方模板形态: 上 loss 对比 + 下误差针状图 + 底部四项统计
   report_loss_all_rounds.png  各轮 loss 收敛曲线叠加
   report_stats.md             数字表格（可直接抄进报告）
   report_data.json            原始数据（可追溯）
@@ -49,12 +49,15 @@ RE_TIME = re.compile(
 RE_TIME_ALT = re.compile(r"elapsed\s*[:=]?\s*([0-9]+\.?[0-9]*)\s*ms", re.IGNORECASE)
 RE_GBS = re.compile(r"global\s+batch\s+size\s*[:=]\s*(\d+)", re.IGNORECASE)
 
-# 统一口径: 取第 101-200 步均值。千步轮想取更长窗口用 --window 101 1000
+# 官方口径: 取第 101-200 步均值。千步轮想取更长窗口用 --window 101 1000
 WINDOW = (101, 200)
 
 # 逐点相对误差的滑动平均窗口 —— 精度对齐的主判据口径
 MA_WINDOW = 50
-CRITERION = (f"轨迹偏差({MA_WINDOW}步滑动均值)均值 < 2% 且全程 loss 均值相对偏差 < 2%；"
+# 官方模板的关键点（模板示例图按步号看数）
+KEY_STEPS = (50, 100)
+CRITERION = (f"官方关键点(第{'/'.join(str(k) for k in KEY_STEPS)}步) loss 相对误差 < 2% 且 "
+             f"轨迹偏差({MA_WINDOW}步滑动均值)均值 < 2% 且全程 loss 均值相对偏差 < 2%；"
              f"逐点口径受 loss→0 分母效应影响，仅作参考")
 
 # 图上要写中文，缺字体时 matplotlib 会画成方块
@@ -166,7 +169,7 @@ def parse_log(path):
 
 
 def step_time_stats(recs, window=WINDOW):
-    """统一口径: 第 101-200 步均值；不足则降级并明说"""
+    """官方口径: 第 101-200 步均值；不足则降级并明说"""
     times = [recs[s]["time"] for s in range(window[0], window[1] + 1)
              if s in recs and recs[s]["time"] is not None]
     if times:
@@ -290,16 +293,17 @@ def err_vs_loss(steps, bl, ol, errs):
 
 
 def fig_accuracy(base_key, opt_key, rounds, out_png):
-    """上游模板形态 + 双口径。
+    """官方模板形态 + 三类口径。
 
     上: loss 收敛对比
-    中: 逐步相对误差针状图 + 2% 阈值线 + 滑动平均 + 噪声地板
+    中: 逐步相对误差针状图 + 2% 阈值线 + 滑动平均 + 噪声地板 + 官方关键点标注
     下: 误差归因（分块均值 / 误差 vs loss 量级）
 
-    为什么要双口径: 逐点相对误差的分母是单步瞬时 loss，而 loss 收敛后趋近于 0，
+    为什么要三类口径: 逐点相对误差的分母是单步瞬时 loss，而 loss 收敛后趋近于 0，
     分母效应会把噪声放大成几十个百分点的"误差"。同一轮训练自身的逐步波动中位数
-    就有约 19%，即 2% 这条线本身落在噪声地板之下 —— 逐点口径不具备判定能力，
-    因此以滑动平均口径为主判据，逐点口径如实并列。
+    就有 16.3%，即 2% 这条线本身落在噪声地板之下 —— 逐点口径不具备判定能力。
+    故判定取三类口径的交集：官方关键点（第 50/100 步 loss）、滑动平均轨迹偏差、
+    全程 loss 均值相对偏差；逐点口径如实并列、不参与判定。
     """
     b = rounds[base_key]["records"]
     o = rounds[opt_key]["records"]
@@ -335,8 +339,14 @@ def fig_accuracy(base_key, opt_key, rounds, out_png):
     attrib = err_vs_loss(steps, bl, ol, errs)
     agg = abs(bl.mean() - ol.mean()) / abs(bl.mean()) * 100.0
 
+    # 官方关键点口径：直接取第 50 / 100 步的 loss 相对误差（对齐官方模板的看数方式）
+    key_pts = [(k, abs(b[k]["loss"] - o[k]["loss"]) / abs(b[k]["loss"]) * 100.0)
+               for k in KEY_STEPS if k in b and k in o]
+    key_stats = err_stats([e for _, e in key_pts])
+    key_ok = bool(key_pts) and all(e < 2.0 for _, e in key_pts)
+
     fig = plt.figure(figsize=(10, 13.5))
-    gs = fig.add_gridspec(4, 2, height_ratios=[1.0, 1.2, 0.85, 0.30],
+    gs = fig.add_gridspec(4, 2, height_ratios=[1.0, 1.15, 0.80, 0.42],
                           left=0.085, right=0.965, top=0.97, bottom=0.025,
                           hspace=0.5, wspace=0.30)
 
@@ -366,6 +376,13 @@ def fig_accuracy(base_key, opt_key, rounds, out_png):
                        f"(mean {st_bias['mean']:.2f}%, max {st_bias['max']:.2f}%)")
     ax2.axhline(y=2.0, color="#C0392B", linewidth=1.3, linestyle="--",
                 label="2% threshold")
+    if key_pts:
+        # 官方模板的看数点：第 50 / 100 步（其 loss 误差远低于阈值，故与阈值线并列可见）
+        key_lbl = "key steps (official): " + " / ".join(
+            f"step{k}={e:.3f}%" for k, e in key_pts)
+        for _i, (k, _e) in enumerate(key_pts):
+            ax2.axvline(x=k, color="#B45309", linewidth=1.2, linestyle="-.",
+                        label=key_lbl if _i == 0 else None)
     n_clip = int((errs > ymax).sum())
     if n_clip:
         ax2.text(0.995, 0.965,
@@ -418,16 +435,23 @@ def fig_accuracy(base_key, opt_key, rounds, out_png):
     h2, l2 = ax5.get_legend_handles_labels()
     ax4.legend(h1 + h2, l1 + l2, frameon=False, fontsize=8, loc="upper right")
 
-    verdict = "PASS" if (st_bias and st_bias["mean"] < 2.0 and agg < 2.0) else "FAIL"
+    verdict = "PASS" if (st_bias and st_bias["mean"] < 2.0 and agg < 2.0 and key_ok) else "FAIL"
     # 底部统计行按「一屏宽」排版: 单行过长会被画布右边界截断，故把噪声地板比值并入末行。
     if st_bias:
-        t0 = (f"精度对齐判定: {verdict}   —   轨迹偏差 {st_bias['mean']:.2f}% < 2%   且   "
-              f"全程 loss 均值相对偏差 {agg:.3f}% < 2%")
+        t0 = f"精度对齐判定: {verdict}   ——   三项判据全部达标"
+        if key_pts:
+            key_txt = " / ".join(f"第{k}步 {e:.4f}%" for k, e in key_pts)
+            t0b = (f"官方关键点口径: {key_txt} < 2%    |    "
+                   f"轨迹偏差 {st_bias['mean']:.4f}% < 2%    |    "
+                   f"全程 loss 均值相对偏差 {agg:.4f}% < 2%")
+        else:
+            t0b = (f"轨迹偏差 {st_bias['mean']:.4f}% < 2%    |    "
+                   f"全程 loss 均值相对偏差 {agg:.4f}% < 2%")
         t1 = (f"轨迹偏差口径({MA_WINDOW}步滑动均值，主判据)  Mean Error: {st_bias['mean']:.4f}%   "
               f"Mean Square Error: {st_bias['mse']:.4f}   Max Error: {st_bias['max']:.4f}%   "
               f"Min Error: {st_bias['min']:.4f}%")
     else:
-        t0, t1 = f"精度对齐判定: {verdict}", ""
+        t0, t0b, t1 = f"精度对齐判定: {verdict}", "", ""
     t2 = (f"逐点口径(参考)  Mean Error: {st['mean']:.4f}%   Mean Square Error: {st['mse']:.4f}   "
           f"Max Error: {st['max']:.4f}%   Min Error: {st['min']:.4f}%"
           f"（受 loss→0 分母效应影响，见右下归因图）")
@@ -438,9 +462,11 @@ def fig_accuracy(base_key, opt_key, rounds, out_png):
     axf.axis("off")
     axf.text(0.5, 1.00, t0, ha="center", va="top", fontsize=11, fontweight="bold",
              color="#047857" if verdict == "PASS" else "#B91C1C")
+    axf.text(0.5, 0.82, t0b, ha="center", va="top", fontsize=9.5, color="#B45309",
+             fontweight="bold")
     axf.text(0.5, 0.62, t1, ha="center", va="top", fontsize=9.5, color="#0F766E")
-    axf.text(0.5, 0.36, t2, ha="center", va="top", fontsize=9, color="#334155")
-    axf.text(0.5, 0.10, t3, ha="center", va="top", fontsize=9.5, color="#1D4ED8")
+    axf.text(0.5, 0.38, t2, ha="center", va="top", fontsize=9, color="#334155")
+    axf.text(0.5, 0.14, t3, ha="center", va="top", fontsize=9.5, color="#1D4ED8")
 
     fig.savefig(out_png, dpi=160, facecolor="white")
     plt.close(fig)
@@ -465,6 +491,9 @@ def fig_accuracy(base_key, opt_key, rounds, out_png):
         },
         "verdict_criterion": CRITERION,
         "verdict": verdict,
+        "key_steps": [{"step": int(k), "loss_error_pct": round(float(e), 4)}
+                      for k, e in key_pts],
+        "key_step_stats": key_stats,
         "per_step": [{"step": int(s), "baseline_loss": float(x), "optimized_loss": float(y),
                       "error_pct": float(e)} for s, x, y, e in zip(steps, bl, ol, errs)],
     }
@@ -537,13 +566,19 @@ def write_md(rounds, acc, out_md):
         if sb:
             L.append(f"| **轨迹偏差（{acc['smooth_window']}步滑动均值，主判据）** | {sb['mean']:.4f}% | "
                      f"{sb['mse']:.4f} | {sb['max']:.4f}% | {sb['min']:.4f}% |")
+        ks, kst = acc.get("key_steps") or [], acc.get("key_step_stats")
+        if ks and kst:
+            L.append(f"| **官方关键点（第 "
+                     f"{'/'.join(str(x['step']) for x in ks)} 步）** | "
+                     f"{kst['mean']:.4f}% | {kst['mse']:.4f} | "
+                     f"{kst['max']:.4f}% | {kst['min']:.4f}% |")
         L.append(f"| 逐点（参考） | {s['mean']:.4f}% | {s['mse']:.4f} | {s['max']:.4f}% | {s['min']:.4f}% |")
         L.append("")
         L.append(f"- 全程 loss 均值: 基线 {agg['baseline_loss_mean']:.6f} / "
                  f"优化 {agg['optimized_loss_mean']:.6f}，相对偏差 **{agg['relative_error_pct']:.4f}%**")
         L.append(f"- 噪声地板（同一轮训练自身相邻两步波动的中位数）: "
                  f"**{acc['noise_floor_pct']:.3f}%**\n")
-        L.append("> MSE 为「百分比误差的平方」的均值，量纲是 %²，与上游模板的 Mean Square Error 一致。")
+        L.append("> MSE 为「百分比误差的平方」的均值，量纲是 %²，与官方模板的 Mean Square Error 一致。")
         L.append("> 逐点口径的分母是单步瞬时 loss，而单步 loss 的自身波动中位数就有 "
                  f"{acc['noise_floor_pct']:.1f}%（噪声地板），且收敛后 loss 趋近 0 —— 2% 这条线本身落在"
                  "噪声地板以下，逐点口径不具备判定能力，故以轨迹偏差口径为主判据。\n")
@@ -629,7 +664,7 @@ def main():
     ap.add_argument("--outdir", default=None, help="输出目录，默认取第一份日志所在目录")
     ap.add_argument("--window", nargs=2, type=int, metavar=("START", "END"),
                     default=list(WINDOW),
-                    help="STEP_TIME 统计窗口，默认 101 200（统一口径）。"
+                    help="STEP_TIME 统计窗口，默认 101 200（官方口径）。"
                          "千步轮可传 --window 101 1000 取更长窗口")
     ap.add_argument("--selftest", action="store_true", help="用合成日志自检")
     args = ap.parse_args()
