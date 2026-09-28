@@ -44,9 +44,9 @@ echo "=== 5) 常见错误速查 ==="
 hit=0
 if grep -q "RT_LIMIT_TYPE_SIMT_WARP_STACK_SIZE" "$LOG"; then
   hit=1
-  echo "  ⚠ 命中: triton-ascend 与 CANN 9.0.0 不兼容"
-  echo "     原因: 配置里用了 gdn_implementation: triton"
-  echo "     解决: 用 run_round.sh 重新生成配置（它只会选 eager 或 ascendc）"
+  echo "  ⚠ 命中: 用了 triton 路径，但 triton-ascend 3.2.0 的 npu_utils.cpp 引用了"
+  echo "           CANN 9.0.0 中不存在的 RT_LIMIT_TYPE_SIMT_WARP_STACK_SIZE"
+  echo "     解决: 在仓库根执行 python3 ascend_porting/patch_triton.py（幂等）"
 fi
 if grep -q "skip_flash_attn_recompute cannot be True" "$LOG"; then
   hit=1
